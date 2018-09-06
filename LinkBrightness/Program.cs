@@ -46,12 +46,14 @@ namespace LinkBrightness
 		static bool opt_hide_on_start = false;
 		static bool opt_hide_on_minimize = false;
 		static bool opt_verbose = false;
+		static int opt_syncdelay = 0;
 
 		public static void ShowUsage()
 		{
 			Console.WriteLine(
 				"\n" +
-				"Usage: " + ProgName + " [/hide_on_start] [/hide_on_minimize] [/verbose]\n" +
+				"Usage: " + ProgName + " [/hide_on_start] [/hide_on_minimize] " +
+				"[/syncdelay <secs>] [/verbose]\n" +
 				"\n" +
 				"If " + ProgName + " is running in its own console window (ie not with another " +
 				"process attached such as command prompt) then it has an icon in the system " +
@@ -70,6 +72,9 @@ namespace LinkBrightness
 				"console window may flicker on start because it cannot be hidden until after " +
 				"it has been created. You can mitigate that by running " + ProgName +
 				" /hide_on_start from a shortcut with Run properties set to 'Minimized'.)\n" +
+				"\n" +
+				"[/syncdelay <secs>]\n" +
+				"When a brightness change is detected wait <secs> seconds before syncing.\n" +
 				"\n" +
 				"[/verbose]\n" +
 				"Be more verbose, such as show every brightness event.\n"
@@ -115,6 +120,19 @@ namespace LinkBrightness
 					opt_hide_on_minimize = true;
 				else if (args[i] == "/verbose")
 					opt_verbose = true;
+				else if (args[i] == "/syncdelay") {
+					++i;
+					if (i == args.Length || !int.TryParse(args[i], out opt_syncdelay)) {
+						Console.Error.WriteLine("Error: /syncdelay used without specifying delay");
+						SoftPause();
+						return EXIT_FAILURE;
+					}
+					if (opt_syncdelay < 0 || opt_syncdelay > 60) {
+						Console.Error.WriteLine("Error: /syncdelay used with out-of-range delay");
+						SoftPause();
+						return EXIT_FAILURE;
+					}
+				}
 				else {
 					Console.Error.WriteLine("Error: Unrecognized option: " + args[i]);
 					Console.Error.WriteLine("Use option /? for usage information.");
@@ -364,6 +382,17 @@ namespace LinkBrightness
 				Console.WriteLine("Active :        " + e.NewEvent.Properties["Active"].Value.ToString());
 				Console.WriteLine("Brightness :    " + e.NewEvent.Properties["Brightness"].Value.ToString());
 				Console.WriteLine("InstanceName :  " + e.NewEvent.Properties["InstanceName"].Value.ToString());
+			}
+
+			if (opt_syncdelay != 0) {
+				ShowHeader();
+				Console.WriteLine("Delaying for " + opt_syncdelay + " seconds before sync...");
+				Console.WriteLine(
+					"WARNING: Additional events that occur during the delay are processed after " +
+					"the delay, and will show timestamps later than when those events actually " +
+					"occurred."
+				);
+				Thread.Sleep(opt_syncdelay * 1000);
 			}
 
 			// Get the current power scheme's AC & DC brightness levels
